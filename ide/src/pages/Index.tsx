@@ -49,11 +49,12 @@ const Index = () => {
     deleteNode,
     renameNode,
     markSaved,
+    network,
+    setNetwork,
   } = useFileStore();
 
   const [terminalExpanded, setTerminalExpanded] = useState(true);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [network, setNetwork] = useState("testnet");
   const [isCompiling, setIsCompiling] = useState(false);
   const [contractId, setContractId] = useState<string | null>(null);
   const [showExplorer, setShowExplorer] = useState(false);
