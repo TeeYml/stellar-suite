@@ -6,6 +6,8 @@ import { X, Circle, FileText, FileCode, FileJson, Settings } from "lucide-react"
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+import { X, Circle } from "lucide-react";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 
 export interface TabInfo {
   path: string[];
@@ -14,10 +16,8 @@ export interface TabInfo {
 }
 
 interface EditorTabsProps {
-  tabs: TabInfo[];
-  activeTab: string;
-  onTabSelect: (path: string[]) => void;
-  onTabClose: (path: string[]) => void;
+  onTabSelect?: (path: string[]) => void;
+  onTabClose?: (path: string[]) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,6 +102,18 @@ export function EditorTabs({ tabs, activeTab, onTabSelect, onTabClose }: EditorT
         const isActive = key === activeTab;
         const isDirty = !!tab.unsaved;
 
+export function EditorTabs({ onTabSelect, onTabClose }: EditorTabsProps) {
+  const { openTabs, activeTabPath, setActiveTabPath, closeTab, unsavedFiles } = useWorkspaceStore();
+  const tabsWithStatus = openTabs.map((t) => ({
+    ...t,
+    unsaved: unsavedFiles.has(t.path.join("/")),
+  }));
+  const activeTabKey = activeTabPath.join("/");
+  return (
+    <div className="flex bg-secondary border-b border-border overflow-x-auto scrollbar-none">
+      {tabsWithStatus.map((tab) => {
+        const key = tab.path.join("/");
+        const isActive = key === activeTabKey;
         return (
           <button
             key={key}
@@ -120,6 +132,7 @@ export function EditorTabs({ tabs, activeTab, onTabSelect, onTabClose }: EditorT
             }`}
             onClick={() => onTabSelect(tab.path)}
             onKeyDown={(e) => handleKeyDown(e, tab.path)}
+            onClick={() => (onTabSelect ? onTabSelect(tab.path) : setActiveTabPath(tab.path))}
           >
             {/* File type icon */}
             <FileIcon name={tab.name} />
@@ -138,14 +151,15 @@ export function EditorTabs({ tabs, activeTab, onTabSelect, onTabClose }: EditorT
               className="shrink-0 rounded p-0.5 transition-opacity"
               onClick={(e) => {
                 e.stopPropagation();
-                onTabClose(tab.path);
+                if (onTabClose) onTabClose(tab.path);
+                else closeTab(tab.path);
               }}
             >
               {isDirty ? (
                 <>
-                  {/* Dot — visible by default, hidden on group hover */}
+                  {/* Dot ï¿½ visible by default, hidden on group hover */}
                   <Circle className="h-2 w-2 fill-primary text-primary group-hover:hidden" aria-hidden="true" />
-                  {/* X — hidden by default, shown on group hover */}
+                  {/* X ï¿½ hidden by default, shown on group hover */}
                   <X className="h-3 w-3 hidden group-hover:block" aria-hidden="true" />
                 </>
               ) : (
