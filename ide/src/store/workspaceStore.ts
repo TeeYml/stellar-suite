@@ -8,8 +8,13 @@ interface TabInfo {
   name: string;
 }
 
+export interface WorkspaceTextFile {
+  path: string;
+  content: string;
+}
+
 export type MobilePanel = "none" | "explorer" | "interact" | "deployments" | "identities";
-export type SidebarTab = "explorer" | "deployments" | "identities" | "search";
+export type SidebarTab = "explorer" | "deployments" | "identities" | "search" | "tests";
 export type BuildState = "idle" | "building" | "success" | "error";
 
 interface WorkspaceState {
@@ -99,6 +104,31 @@ const findParent = (nodes: FileNode[], pathParts: string[]): FileNode[] | null =
   return parent?.children ?? null;
 };
 
+export function flattenWorkspaceFiles(
+  nodes: FileNode[],
+  parentPath: string[] = []
+): WorkspaceTextFile[] {
+  const result: WorkspaceTextFile[] = [];
+
+  for (const node of nodes) {
+    const nextPath = [...parentPath, node.name];
+
+    if (node.type === "folder" && node.children) {
+      result.push(...flattenWorkspaceFiles(node.children, nextPath));
+      continue;
+    }
+
+    if (node.type === "file") {
+      result.push({
+        path: nextPath.join("/"),
+        content: node.content ?? "",
+      });
+    }
+  }
+
+  return result;
+}
+
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
@@ -138,7 +168,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       addTab: (path, name) => {
         const key = path.join("/");
         const { openTabs } = get();
-        if (!openTabs.some(t => t.path.join("/") === key)) {
+        if (!openTabs.some((t) => t.path.join("/") === key)) {
           set({ openTabs: [...openTabs, { path, name }] });
         }
         set({ activeTabPath: path });
@@ -146,22 +176,30 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       closeTab: (path) => {
         const key = path.join("/");
         const { openTabs, activeTabPath, unsavedFiles } = get();
-        const nextTabs = openTabs.filter(t => t.path.join("/") !== key);
+        const nextTabs = openTabs.filter((t) => t.path.join("/") !== key);
         let nextActivePath = activeTabPath;
+
         if (activeTabPath.join("/") === key && nextTabs.length > 0) {
           nextActivePath = nextTabs[nextTabs.length - 1].path;
         } else if (nextTabs.length === 0) {
           nextActivePath = [];
         }
+
         const nextUnsaved = new Set(unsavedFiles);
         nextUnsaved.delete(key);
-        set({ openTabs: nextTabs, activeTabPath: nextActivePath, unsavedFiles: nextUnsaved });
+
+        set({
+          openTabs: nextTabs,
+          activeTabPath: nextActivePath,
+          unsavedFiles: nextUnsaved,
+        });
       },
       updateFileContent: (path, content) => {
         const key = path.join("/");
         const { files, unsavedFiles } = get();
         const nextFiles = cloneFiles(files);
         const node = findNode(nextFiles, path);
+
         if (node) {
           node.content = content;
           const nextUnsaved = new Set(unsavedFiles);
@@ -179,12 +217,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       createFile: (parentPath, name, content = "") => {
         const { files } = get();
         const nextFiles = cloneFiles(files);
-        const parent = parentPath.length === 0 ? nextFiles : findNode(nextFiles, parentPath)?.children;
+        const parent =
+          parentPath.length === 0
+            ? nextFiles
+            : findNode(nextFiles, parentPath)?.children;
+
         if (parent) {
           parent.push({
             name,
             type: "file",
-            language: name.endsWith(".rs") ? "rust" : name.endsWith(".toml") ? "toml" : "text",
+            language: name.endsWith(".rs")
+              ? "rust"
+              : name.endsWith(".toml")
+              ? "toml"
+              : "text",
             content,
           });
           set({ files: nextFiles });
@@ -194,7 +240,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       createFolder: (parentPath, name) => {
         const { files } = get();
         const nextFiles = cloneFiles(files);
-        const parent = parentPath.length === 0 ? nextFiles : findNode(nextFiles, parentPath)?.children;
+        const parent =
+          parentPath.length === 0
+            ? nextFiles
+            : findNode(nextFiles, parentPath)?.children;
+
         if (parent) {
           parent.push({ name, type: "folder", children: [] });
           set({ files: nextFiles });
@@ -204,8 +254,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const { files } = get();
         const nextFiles = cloneFiles(files);
         const parent = findParent(nextFiles, path);
+
         if (parent) {
-          const idx = parent.findIndex(n => n.name === path[path.length - 1]);
+          const idx = parent.findIndex((n) => n.name === path[path.length - 1]);
           if (idx !== -1) {
             parent.splice(idx, 1);
             set({ files: nextFiles });
@@ -219,21 +270,36 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const nextPath = [...path.slice(0, -1), newName];
         const nextFiles = cloneFiles(files);
         const node = findNode(nextFiles, path);
+
         if (node) {
           node.name = newName;
-          const nextTabs = openTabs.map(t => {
+
+          const nextTabs = openTabs.map((t) => {
             const tKey = t.path.join("/");
             if (tKey === oldKey || tKey.startsWith(oldKey + "/")) {
               const updatedPath = [...nextPath, ...t.path.slice(path.length)];
-              return { ...t, path: updatedPath, name: updatedPath[updatedPath.length - 1] };
+              return {
+                ...t,
+                path: updatedPath,
+                name: updatedPath[updatedPath.length - 1],
+              };
             }
             return t;
           });
+
           let nextActivePath = activeTabPath;
-          if (activeTabPath.join("/") === oldKey || activeTabPath.join("/").startsWith(oldKey + "/")) {
+          if (
+            activeTabPath.join("/") === oldKey ||
+            activeTabPath.join("/").startsWith(oldKey + "/")
+          ) {
             nextActivePath = [...nextPath, ...activeTabPath.slice(path.length)];
           }
-          set({ files: nextFiles, openTabs: nextTabs, activeTabPath: nextActivePath });
+
+          set({
+            files: nextFiles,
+            openTabs: nextTabs,
+            activeTabPath: nextActivePath,
+          });
         }
       },
 
@@ -242,14 +308,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const config = NETWORK_CONFIG[network] || NETWORK_CONFIG.testnet;
         const currentCustomRpc = get().customRpcUrl || DEFAULT_CUSTOM_RPC;
         const horizonUrl = network === "local" ? currentCustomRpc : config.horizon;
+
         set({
           network,
           horizonUrl,
           networkPassphrase: config.passphrase,
         });
       },
-      setHorizonUrl: (url) => set({ horizonUrl: url }),
-      setNetworkPassphrase: (passphrase) => set({ networkPassphrase: passphrase }),
+      setHorizonUrl: (horizonUrl) => set({ horizonUrl }),
+      setNetworkPassphrase: (networkPassphrase) => set({ networkPassphrase }),
       setCustomRpcUrl: (customRpcUrl) => {
         set({ customRpcUrl });
         if (get().network === "local") {
@@ -258,10 +325,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
 
       // UI Actions Implementation
-      setTerminalExpanded: (expanded) => 
-        set((state) => ({ terminalExpanded: typeof expanded === 'function' ? expanded(state.terminalExpanded) : expanded })),
-      setTerminalOutput: (output) => 
-        set((state) => ({ terminalOutput: typeof output === 'function' ? output(state.terminalOutput) : output })),
+      setTerminalExpanded: (expanded) =>
+        set((state) => ({
+          terminalExpanded:
+            typeof expanded === "function"
+              ? expanded(state.terminalExpanded)
+              : expanded,
+        })),
+      setTerminalOutput: (output) =>
+        set((state) => ({
+          terminalOutput:
+            typeof output === "function"
+              ? output(state.terminalOutput)
+              : output,
+        })),
       setIsCompiling: (isCompiling) => set({ isCompiling }),
       setBuildState: (buildState) => set({ buildState }),
       setContractId: (contractId) => set({ contractId }),
@@ -272,7 +349,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setMobilePanel: (mobilePanel) => set({ mobilePanel }),
       setIsExplorerDragActive: (isExplorerDragActive) => set({ isExplorerDragActive }),
       setLeftSidebarTab: (leftSidebarTab) => set({ leftSidebarTab }),
-      appendTerminalOutput: (chunk) => set((state) => ({ terminalOutput: state.terminalOutput + chunk })),
+      appendTerminalOutput: (chunk) =>
+        set((state) => ({ terminalOutput: state.terminalOutput + chunk })),
 
       // Misc Actions Implementation
       setHydrationComplete: (ready) => set({ hydrationComplete: ready }),
