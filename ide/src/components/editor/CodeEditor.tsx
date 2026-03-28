@@ -43,7 +43,8 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ onCursorChange, onSave }) => {
   const rustProviderRegistered = useRef(false);
 
   const monacoRef = useRef<typeof Monaco | null>(null);
-  const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);  const semanticProviderRegistered = useRef(false);
+  const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const semanticProviderRegistered = useRef(false);
   const coverageDecorations = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null);
   const codeActionProviderRegistered = useRef(false);
 
