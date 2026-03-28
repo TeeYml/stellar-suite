@@ -12,6 +12,9 @@ import {
   RUST_FOLD_REGION_END,
   RUST_FOLD_REGION_START,
 } from "@/lib/rustFolding";
+import { RustSemanticTokensProvider } from "@/lib/semanticTokensProvider";
+import { definitionProvider } from "@/lib/definitionProvider";
+import { symbolIndexer } from "@/lib/symbolIndexer";
 import Editor, { OnChange, OnMount } from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
 import React, { Suspense, useEffect, useRef, useState } from "react";
@@ -24,10 +27,7 @@ import { useTestGutter } from "@/hooks/useTestGutter";
 import { GitGutterMarkers } from "./GitGutterMarkers";
 import { git } from "@/lib/git";
 import "@/styles/editor-gutter.css";
-import { symbolIndexer } from "@/lib/symbolIndexer";
-import { definitionProvider } from "@/lib/definitionProvider";
 import { referenceProvider } from "@/lib/referenceProvider";
-import { RustSemanticTokensProvider } from "@/lib/semanticTokensProvider";
 
 interface CodeEditorProps {
   onCursorChange?: (line: number, col: number) => void;
@@ -43,9 +43,9 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ onCursorChange, onSave }) => {
   const { openErrorHelp } = useErrorHelpStore();
   const rustProviderRegistered = useRef(false);
 
-  useTestGutter({ editor: editorRef.current, monaco: monacoRef.current, filePath: activeFileId });
   const monacoRef = useRef<typeof Monaco | null>(null);
-  const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);  const semanticProviderRegistered = useRef(false);
+  const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const semanticProviderRegistered = useRef(false);
   const coverageDecorations = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null);
   const codeActionProviderRegistered = useRef(false);
 
@@ -61,6 +61,8 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ onCursorChange, onSave }) => {
   useEffect(() => {
     activeFileIdRef.current = activeFileId;
   }, [activeFileId]);
+
+  useTestGutter({ editor: editorRef.current, monaco: monacoRef.current, filePath: activeFileId });
 
   const activeFile = React.useMemo(() => {
     const findNode = (

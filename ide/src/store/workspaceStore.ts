@@ -1,8 +1,8 @@
 import {
   DEFAULT_CUSTOM_RPC,
   NETWORK_CONFIG,
+  type CustomHeaders,
   NetworkKey,
-  CustomHeaders,
 } from "@/lib/networkConfig";
 import { FileNode, sampleContracts } from "@/lib/sample-contracts";
 import { create } from "zustand";
@@ -30,7 +30,7 @@ export type SidebarTab =
   | "tests"
   | "outline"
   | "inspector"
-  | "references";
+  | "references"
   | "binary-diff";
 export type BuildState = "idle" | "building" | "success" | "error";
 

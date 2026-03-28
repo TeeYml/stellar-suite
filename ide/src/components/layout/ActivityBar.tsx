@@ -26,7 +26,7 @@ export type ActivityTab =
   | "security"
   | "tests"
   | "outline"
-  | "references";
+  | "references"
   | "binary-diff"
   | "oracle";
 
@@ -104,6 +104,12 @@ const tabs: ActivityBarTab[] = [
     icon: <Library className="h-5 w-5" />,
     label: "References",
     title: "Find All References",
+  },
+  {
+    id: "oracle",
+    icon: <Plug className="h-5 w-5" />,
+    label: "Oracle",
+    title: "Oracle Integration Assistant",
   },
 ];
 

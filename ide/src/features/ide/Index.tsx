@@ -25,11 +25,13 @@ import { SecurityView } from "@/components/ide/SecurityView";
 import { TestingView, TemplatesView } from "@/components/ide/TestingView";
 import { GeneratePropertyTest } from "@/components/Testing/GeneratePropertyTest";
 import { useProptestOutputWatcher } from "@/hooks/useProptestOutputWatcher";
+import { ProptestView } from "@/components/Panels/ProptestView";
 import { EventsPane } from "@/components/ide/EventsPane";
 import { ReferencesPane } from "@/components/ide/ReferencesPane";
 import { InspectorPane } from "@/components/ide/InspectorPane";
 import { StatusBar } from "@/components/ide/StatusBar";
 import { Terminal } from "@/components/ide/Terminal";
+import { TestResultsLog } from "@/components/terminal/TestResultsLog";
 // import TestExplorer from "@/components/ide/TestExplorer";
 import XdrInspector from "@/components/tools/XdrInspector";
 // import { Toolbar } from "@/components/ide/Toolbar";
@@ -56,6 +58,14 @@ import {
   createStreamProcessor,
   readCompileResponse,
 } from "@/utils/compileStream";
+import {
+  createSimulatedCargoTestOutput,
+  formatTestRunForTerminal,
+  parseStructuredTestOutput,
+  resolveWorkspacePathForTrace,
+  toRevealRange,
+  type TestRunResult,
+} from "@/lib/testResults";
 
 const COMPILE_API_URL =
   process.env.NEXT_PUBLIC_COMPILE_API_URL ?? "/api/compile";
@@ -189,6 +199,7 @@ export default function Index() {
     mockLedgerState,
     diffViewPath,
     setDiffViewPath,
+    setTerminalOutput,
   } = useWorkspaceStore();
 
   const { activeContext, activeIdentity, loadIdentities } = useIdentityStore();
@@ -239,6 +250,7 @@ export default function Index() {
   const [isRunningAudit, setIsRunningAudit] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [lastAuditRunAt, setLastAuditRunAt] = useState<string | null>(null);
+  const [testRun, setTestRun] = useState<TestRunResult | null>(null);
 
   useEffect(() => {
     loadIdentities();
@@ -644,12 +656,51 @@ export default function Index() {
       );
     }
 
-    appendTerminalOutput("Running tests...\r\n");
-    setTimeout(() => {
-      appendTerminalOutput("✓ test_hello ... ok\r\n");
-      appendTerminalOutput("test result: ok. 1 passed; 0 failed;\r\n");
-    }, 900);
-  }, [appendTerminalOutput, setTerminalExpanded, mockLedgerState]);
+    const rawOutput = createSimulatedCargoTestOutput({ files, activeTabPath });
+    const nextRun = parseStructuredTestOutput(rawOutput);
+    setTestRun(nextRun);
+    setTerminalOutput(formatTestRunForTerminal(nextRun));
+  }, [activeTabPath, appendTerminalOutput, files, mockLedgerState, setTerminalExpanded, setTerminalOutput]);
+
+  const handleRerunFailedTests = useCallback(() => {
+    const rawOutput = createSimulatedCargoTestOutput({
+      files,
+      activeTabPath,
+      previousRun: testRun,
+      rerunFailedOnly: true,
+    });
+    const nextRun = parseStructuredTestOutput(rawOutput);
+    setTestRun(nextRun);
+    setTerminalExpanded(true);
+    setTerminalOutput(formatTestRunForTerminal(nextRun));
+  }, [activeTabPath, files, setTerminalExpanded, setTerminalOutput, testRun]);
+
+  const handleOpenTestTrace = useCallback(
+    (traceFile: string, line: number, column = 1) => {
+      const pathParts = resolveWorkspacePathForTrace(traceFile, files);
+      if (!pathParts) {
+        appendTerminalOutput(`Unable to resolve ${traceFile}:${line}:${column}\r\n`);
+        return;
+      }
+      addTab(pathParts, pathParts[pathParts.length - 1]);
+      setActiveTabPath(pathParts);
+      window.dispatchEvent(
+        new CustomEvent("ide:reveal-range", {
+          detail: {
+            fileId: pathParts.join("/"),
+            pathParts,
+            range: toRevealRange(line, column),
+          },
+        }),
+      );
+    },
+    [addTab, appendTerminalOutput, files, setActiveTabPath],
+  );
+
+  const handleClearTerminal = useCallback(() => {
+    setTerminalOutput("");
+    setTestRun(null);
+  }, [setTerminalOutput]);
 
   const handleInvoke = useCallback(
     async (fn: string, args: string) => {
@@ -871,7 +922,18 @@ export default function Index() {
 
             {/* Tab panels */}
             <div className="min-h-0 flex-1 overflow-hidden">
-              {bottomTab === "console"  && <Terminal />}
+              {bottomTab === "console" && (
+                <Terminal
+                  onClear={handleClearTerminal}
+                  supplementaryContent={
+                    <TestResultsLog
+                      result={testRun}
+                      onOpenTrace={handleOpenTestTrace}
+                      onRerunFailed={handleRerunFailedTests}
+                    />
+                  }
+                />
+              )}
               {bottomTab === "events"   && <EventsPane />}
               {bottomTab === "proptest" && <ProptestView />}
             </div>
