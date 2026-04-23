@@ -248,7 +248,7 @@ async function fetchWithWorkerSRI(url) {
   
   if (!_workerManifest) {
     try {
-      const mResp = await fetch('/wasm-hashes.json', { cache: 'no-store' });
+      const mResp = await fetch('/sri-manifest.json', { cache: 'no-store' });
       if (mResp.ok) _workerManifest = await mResp.json();
     } catch {
       // Ignore
